@@ -1,17 +1,16 @@
 Configuration
 -------------
-*Need to create config.inc in parallel to README.md with following variable definations
-
+* Need to create config.inc in parallel to README.md with following variable definations
+```php
 define('aws_access_key_id','XXXXXXXX');
 define('secret_key','XXXXXXXX');
 define('seller_id','XXXXXXXX');
-
 define('marketplace_id','A1F83G8C2ARO7P');
 define('application_name','MarketplaceWebServiceProducts PHP5 Library');
 define('application_version','2');
 define('date_format','Y-m-d');
 define('service_url','https://mws-eu.amazonservices.com');
-
+```
 
 Amazon MWS Endpoints
 --------------------
