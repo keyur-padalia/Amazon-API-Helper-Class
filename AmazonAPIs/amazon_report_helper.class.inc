@@ -19,7 +19,7 @@ use DateTimeZone;
 use DateTime;
 use DateInterval;
 // Including Undefined Class Files
-$amazonPath = realpath(__DIR__ . 'Reports/src');
+$amazonPath = realpath(__DIR__ . '/Reports/src');
 set_include_path($amazonPath . PATH_SEPARATOR . get_include_path());
 
 spl_autoload_register(function ($className)
@@ -46,12 +46,20 @@ class AmazonReportHelper
     public $report_type;
     public $report_data_array;
     public $service;
+    public $reporting_days;
 
-    function __construct($report_type)
+    /**
+     *
+     * @param String $report_type ReportType enumeration
+     * @param Boolean $use_cached_report true/false if set to true then it will try to get similar report generated in last 1 hours
+     * @param String $reporting_days How far back reporting data you want. Please supply negative value i.e. -10,-30 etc.<br/> By default it's -7. Some report types won't go far back to 30 days.
+     */
+    function __construct($report_type, $use_cached_report = false, $reporting_days = "-7")
     {
         $this->report_type = $report_type;
+        $this->reporting_days = $reporting_days;
 
-        // Setting Amazon API's Credential variables
+        $this->report_data_array["use_caching"] = $use_cached_report;
         $this->report_data_array["done"] = FALSE;
         $this->report_data_array["report_data"] = NULL;
         $this->report_data_array["report_request_id"] = '';
@@ -65,6 +73,7 @@ class AmazonReportHelper
         $this->report_data_array["marketplace_id"] = marketplace_id;
         $this->report_data_array["serviceURL"] = service_url;
         $this->report_data_array["date_format"] = date_format;
+
 
         $this->report_data_array["config"] = array(
             'ServiceURL' => $this->report_data_array["serviceURL"],
@@ -82,57 +91,45 @@ class AmazonReportHelper
         echo "\nRequesting Report " . $this->report_type;
         echo "\n==============================================================\n\n";
 
-        // Checking if there is any report available for given report_type since last 2 hour, then use it
-        $reportID = $this->check_report_generated_nearby_time();
-        if($reportID !== FALSE)
+        if($this->report_data_array["use_caching"])
         {
-            $this->report_data_array["report_id"] = $reportID;
-            // Getting Final Report
-            $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
-            $request_report_data->setMerchant($this->report_data_array["seller_id"]);
-            $request_report_data->setReport(@fopen('php://memory', 'rw+'));
-            $request_report_data->setReportId($reportID);
+            // Checking if there is any report available for given report_type since last 1 hour, then use it
+            $reportID = $this->check_report_generated_nearby_time();
+            if($reportID !== FALSE)
+            {
+                $this->report_data_array["report_id"] = $reportID;
+                // Getting Final Report
+                $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
+                $request_report_data->setMerchant($this->report_data_array["seller_id"]);
+                $request_report_data->setReport(@fopen('php://memory', 'rw+'));
+                $request_report_data->setReportId($reportID);
 
-            $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
-            $this->report_data_array["done"] = TRUE;
-            return $this->report_data_array["report_data"];
+                $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
+                $this->report_data_array["done"] = TRUE;
+                return $this->report_data_array["report_data"];
+            }
         }
 
         //Didn't found any recent report, so requesting new report
         $request = new MarketplaceWebService_Model_RequestReportRequest();
         $marketplaceIdArray = array("Id" => array($this->report_data_array["marketplace_id"]));
         $request->setMarketplaceIdList($marketplaceIdArray);
-        $request->setMerchant($pos_data['merchant_id']);
+        $request->setMerchant($this->report_data_array['seller_id']);
         $request->setReportType($this->report_type);
 
-        if($this->report_type == "_GET_AMAZON_FULFILLED_SHIPMENTS_DATA_")
-        {
-            $request->setStartDate(new DateTime('-7 Days', new DateTimeZone('UTC')));
-        }
-        elseif($this->report_type == "_GET_FLAT_FILE_ORDERS_DATA_")
-        {
-            $request->setStartDate(new DateTime('-15 days', new DateTimeZone('UTC')));
-        }
-        elseif($this->report_type == "_GET_SELLER_FEEDBACK_DATA_")
-        {
-            $request->setStartDate(new DateTime('-7 Days', new DateTimeZone('UTC')));
-        }
-        elseif($this->report_type == "_GET_FLAT_FILE_ALL_ORDERS_DATA_BY_LAST_UPDATE_")
-        {
-            $request->setStartDate(new DateTime('-30 Days', new DateTimeZone('UTC')));
-        }
+        $request->setStartDate(new DateTime("$this->reporting_days Days", new DateTimeZone('UTC')));
 
         $this->report_data_array["report_request_id"] = $this->invokeRequestReport($this->service, $request);
 
 
-        return $this->report_data_array;
+        return $this->report_data_array["report_data"];
     }
 
     private function check_report_generated_nearby_time()
     {
         // Getting report ID to get final report
         $request_report_list = new MarketplaceWebService_Model_GetReportListRequest();
-        $request_report_list->setMerchant($this->report_data_array["merchant_id"]);
+        $request_report_list->setMerchant($this->report_data_array["seller_id"]);
         $request_report_list->setAcknowledged(false);
 
         $report_type_request = new MarketplaceWebService_Model_TypeList();
@@ -158,7 +155,7 @@ class AmazonReportHelper
 
                     $availableDateObj->add(new DateInterval('PT2H'));
 
-                    // Checking if the available timestamp is withing last 2 hour
+                    // Checking if the available timestamp is withing last 1 hour
                     if(strtotime($availableDate) > strtotime("-1 Hour"))
                     {
                         echo "\n====== ReportRequestId : " . $reportInfo->getReportRequestId();
@@ -203,6 +200,24 @@ class AmazonReportHelper
                     }
                 }
             }
+        }
+        catch(MarketplaceWebService_Exception $ex)
+        {
+            echo("Caught Exception: " . $ex->getMessage() . "\n");
+            echo("Response Status Code: " . $ex->getStatusCode() . "\n");
+            echo("Error Code: " . $ex->getErrorCode() . "\n");
+            echo("Error Type: " . $ex->getErrorType() . "\n");
+            echo("Request ID: " . $ex->getRequestId() . "\n");
+            echo("XML: " . $ex->getXML() . "\n");
+        }
+    }
+
+    private function invokeGetReport(MarketplaceWebService_Interface $service, $request)
+    {
+        try
+        {
+            $response = $service->getReport($request);
+            return stream_get_contents($request->getReport());
         }
         catch(MarketplaceWebService_Exception $ex)
         {
