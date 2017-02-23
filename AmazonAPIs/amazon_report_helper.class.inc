@@ -273,7 +273,7 @@ class AmazonReportHelper
             {
                 $response = $service->getReportRequestList($request);
 
-                echo ("\n\n=================================Report Status For Report Request ID = $report_requestID============================================");
+                echo ("\n\n=======================Report Status For Report Request ID = $report_requestID=======================");
                 echo "\nAttempt : $attempts\n";
 
                 if($response->isSetGetReportRequestListResult())
@@ -299,7 +299,7 @@ class AmazonReportHelper
                             {
                                 echo("\nReportProcessingStatus :" . $reportRequestInfo->getReportProcessingStatus());
                             }
-                            echo ("\n=========================================================================================================\n\n");
+                            
                             if($reportRequestInfo->isSetReportProcessingStatus())
                             {
                                 $status = $reportRequestInfo->getReportProcessingStatus();
@@ -322,8 +322,7 @@ class AmazonReportHelper
 
                 echo "\n\n::::::::::::::::Waiting For Next $wait Seconds..!::::::::::::::::\n\n";
                 sleep($wait);
-                $wait *= 1.5;
-                echo "\n======================================================================================================================================\n";
+                $wait *= 1.5;                
             }
             while($status != "_DONE_" OR $status != "_DONE_NO_DATA_" OR $status != "_CANCELLED_");
         }
@@ -348,7 +347,7 @@ class AmazonReportHelper
             do
             {
                 $response = $service->getReportList($request);
-                echo "\n\n=================================== Getting ReportID For Requested Report ID = $report_request_ID  ===================================";
+                echo "\n\n========================= Getting ReportID For Requested Report ID = $report_request_ID  =========================";
 
                 if($response->isSetGetReportListResult())
                 {
@@ -360,8 +359,7 @@ class AmazonReportHelper
                     {
                         echo("\n====== ReportRequestId: " . $reportInfo->getReportRequestId());
                         echo("\n====== ReportId: " . $reportInfo->getReportId());
-                        echo("\n====== ReportType: " . $reportInfo->getReportType());
-                        echo "\n===============================================================================================================================\n";
+                        echo("\n====== ReportType: " . $reportInfo->getReportType());                        
 
                         if($reportInfo->getReportRequestId() == $report_request_ID)
                         {
