@@ -121,6 +121,45 @@ class AmazonReportHelper
 
         $this->report_data_array["report_request_id"] = $this->invokeRequestReport($this->service, $request);
 
+        // Getting final report
+        foreach($this->pos as $pos_id => $pos_data)
+        {
+            $report_requestID = $this->report_data_array["report_request_id"];
+
+            $report_request = new MarketplaceWebService_Model_GetReportRequestListRequest();
+            $report_request->setMerchant($this->report_data_array["seller_id"]);
+
+            $report_type_request = new MarketplaceWebService_Model_TypeList();
+            $report_type_request->setType($this->report_type);
+            $report_request->setReportTypeList($report_type_request);
+
+            $report_request_status = $this->invokeGetReportRequestList($this->service, $report_request, $report_requestID);
+
+            // If data for requested report is not available or report took too long then set report data to NULL and continue with other POS reports
+            if($report_request_status == FALSE)
+            {
+                continue;
+            }
+
+            // Getting report ID to get final report
+            $request_report_list = new MarketplaceWebService_Model_GetReportListRequest();
+            $request_report_list->setMerchant($this->report_data_array["seller_id"]);
+            $request_report_list->setAcknowledged(false);
+
+            $report_type_request = new MarketplaceWebService_Model_TypeList();
+            $report_type_request->setType($this->report_type);
+            $request_report_list->setReportTypeList($report_type_request);
+
+            $this->report_data_array["report_id"] = $this->invokeGetReportList($this->service, $request_report_list, $report_requestID);
+
+            // Getting Final Report
+            $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
+            $request_report_data->setMerchant($pos_data["merchant_id"]);
+            $request_report_data->setReport(@fopen('php://memory', 'rw+'));
+            $request_report_data->setReportId($this->report_data_array["report_id"]);
+
+            $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
+        }
 
         return $this->report_data_array["report_data"];
     }
@@ -200,6 +239,129 @@ class AmazonReportHelper
                     }
                 }
             }
+        }
+        catch(MarketplaceWebService_Exception $ex)
+        {
+            echo("Caught Exception: " . $ex->getMessage() . "\n");
+            echo("Response Status Code: " . $ex->getStatusCode() . "\n");
+            echo("Error Code: " . $ex->getErrorCode() . "\n");
+            echo("Error Type: " . $ex->getErrorType() . "\n");
+            echo("Request ID: " . $ex->getRequestId() . "\n");
+            echo("XML: " . $ex->getXML() . "\n");
+        }
+    }
+
+    private function invokeGetReportRequestList(MarketplaceWebService_Interface $service, $request, $report_requestID)
+    {
+        //Initially Wait for 90 Seconds.
+        $wait = 90;
+
+        try
+        {
+            $status = '';
+            $attempts = 0;
+            do
+            {
+                $response = $service->getReportRequestList($request);
+
+                echo ("\n\n=================================Report Status For Report Request ID = $report_requestID============================================");
+                echo "\nAttempt : $attempts\n";
+
+                if($response->isSetGetReportRequestListResult())
+                {
+                    $getReportRequestListResult = $response->getGetReportRequestListResult();
+
+                    $reportRequestInfoList = $getReportRequestListResult->getReportRequestInfoList();
+                    foreach($reportRequestInfoList as $reportRequestInfo)
+                    {
+
+                        //Check Status For Requested Report ID
+                        if($reportRequestInfo->getReportRequestId() == $report_requestID)
+                        {
+                            if($reportRequestInfo->isSetReportRequestId())
+                            {
+                                echo("\nReportRequestId :" . $reportRequestInfo->getReportRequestId());
+                            }
+                            if($reportRequestInfo->isSetReportType())
+                            {
+                                echo("\nReportType :" . $reportRequestInfo->getReportType());
+                            }
+                            if($reportRequestInfo->isSetReportProcessingStatus())
+                            {
+                                echo("\nReportProcessingStatus :" . $reportRequestInfo->getReportProcessingStatus());
+                            }
+                            echo ("\n=========================================================================================================\n\n");
+                            if($reportRequestInfo->isSetReportProcessingStatus())
+                            {
+                                $status = $reportRequestInfo->getReportProcessingStatus();
+
+                                if($status == "_DONE_")
+                                    return TRUE;
+                            }
+                        }
+                    }
+                }
+
+                $attempts++;
+                if($attempts > 5)
+                {
+                    exit("too many attempts to access reportr form Amazon API");
+                }
+
+                if($status == "_DONE_NO_DATA_" OR $status == "_CANCELLED_")
+                    return FALSE;
+
+                echo "\n\n::::::::::::::::Waiting For Next $wait Seconds..!::::::::::::::::\n\n";
+                sleep($wait);
+                $wait *= 1.5;
+                echo "\n======================================================================================================================================\n";
+            }
+            while($status != "_DONE_" OR $status != "_DONE_NO_DATA_" OR $status != "_CANCELLED_");
+        }
+        catch(MarketplaceWebService_Exception $ex)
+        {
+            echo("Caught Exception: " . $ex->getMessage() . "\n");
+            echo("Response Status Code: " . $ex->getStatusCode() . "\n");
+            echo("Error Code: " . $ex->getErrorCode() . "\n");
+            echo("Error Type: " . $ex->getErrorType() . "\n");
+            echo("Request ID: " . $ex->getRequestId() . "\n");
+            echo("XML: " . $ex->getXML() . "\n");
+        }
+    }
+
+    private function invokeGetReportList(MarketplaceWebService_Interface $service, $request, $report_request_ID)
+    {
+        try
+        {
+            $reportID = '';
+
+            do
+            {
+                $response = $service->getReportList($request);
+                echo "\n\n=================================== Getting ReportID For Requested Report ID = $report_request_ID  ===================================";
+
+                if($response->isSetGetReportListResult())
+                {
+                    echo("\n============> GetReportListResult");
+                    $getReportListResult = $response->getGetReportListResult();
+                    $reportInfoList = $getReportListResult->getReportInfoList();
+
+                    foreach($reportInfoList as $reportInfo)
+                    {
+                        echo("\n====== ReportRequestId: " . $reportInfo->getReportRequestId());
+                        echo("\n====== ReportId: " . $reportInfo->getReportId());
+                        echo("\n====== ReportType: " . $reportInfo->getReportType());
+                        echo "\n===============================================================================================================================\n";
+
+                        if($reportInfo->getReportRequestId() == $report_request_ID)
+                        {
+                            $reportID = $reportInfo->getReportId();
+                            return $reportID;
+                        }
+                    }
+                }
+            }
+            while($reportID == '');
         }
         catch(MarketplaceWebService_Exception $ex)
         {
