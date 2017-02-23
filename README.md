@@ -1,7 +1,17 @@
-Configuration
--------------
-* Need to create config.inc in parallel to README.md with following variable definations
+#Amazon API Helper Classes for PHP
+
+##Description
+This Amazon API Helper Classes for PHP helps you to use Amazon APIs, such as:
+* Reports API
+* Products API (*not yet in this repository*)
+* Feeds API (*not yet in this repository*)
+* Orders API (*not yet in this repository*)
+
+###Installation
+
+* Need to create config.inc in parallel with AmazonAPIs directory with following variable declaration
 ```php
+<?php
 define('aws_access_key_id','XXXXXXXX');
 define('secret_key','XXXXXXXX');
 define('seller_id','XXXXXXXX');
@@ -12,8 +22,8 @@ define('date_format','Y-m-d');
 define('service_url','https://mws-eu.amazonservices.com');
 ```
 
-Amazon MWS Endpoints
---------------------
+###Amazon MWS Endpoints
+
 |       Region       |        Amazon MWS Endpoint        |
 |--------------------|-----------------------------------|
 | North America (NA) | https://mws.amazonservices.com    |
@@ -22,9 +32,9 @@ Amazon MWS Endpoints
 | China (CN)         | https://mws.amazonservices.com.cn |
 | Japan (JP)         | https://mws.amazonservices.jp     |
 
-Amazon MWS MarketplaceIds
--------------------------
-####North America Region
+###Amazon MWS MarketplaceIds
+
+* North America Region
 
 | Amazon Marketplace | MarketplaceId  |
 |--------------------|----------------|
@@ -32,7 +42,7 @@ Amazon MWS MarketplaceIds
 | MX                 | A1AM78C64UM0Y8 |
 | US                 | ATVPDKIKX0DER  |
 
-####Europe Region
+* Europe Region
 
 | Amazon Marketplace | MarketplaceId  |
 |--------------------|----------------|
@@ -42,25 +52,25 @@ Amazon MWS MarketplaceIds
 | IT                 | APJ6JRA9NG5V4  |
 | UK                 | A1F83G8C2ARO7P |
 
-####India Region
+* India Region
 
 | Amazon Marketplace | MarketplaceId |
 |--------------------|---------------|
 | IN                 | A21TJRUUN4KGV |
 
-####Japan Region
+* Japan Region
 
 | Amazon Marketplace | MarketplaceId  |
 |--------------------|----------------|
 | JP                 | A1VC38T7YXB528 |
 
-####China Region
+* China Region
 
 | Amazon Marketplace | MarketplaceId |
 |--------------------|---------------|
 | CN                 | AAHKV2X7AFYLW |
 
-####Common HTTP error status codes
+###Common HTTP error status codes
 
 |       Error code        | HTTP status code |                                                     Description                                                      |
 |-------------------------|------------------|----------------------------------------------------------------------------------------------------------------------|
