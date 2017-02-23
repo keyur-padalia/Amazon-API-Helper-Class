@@ -45,8 +45,9 @@ class AmazonReportHelper
 
     public $report_type;
     public $report_data_array;
-    public $service;
+    private $service;
     public $reporting_days;
+    private $report_error;
 
     /**
      *
@@ -91,6 +92,7 @@ class AmazonReportHelper
         echo "\nRequesting Report " . $this->report_type;
         echo "\n==============================================================\n\n";
 
+        //If getting cached report
         if($this->report_data_array["use_caching"])
         {
             // Checking if there is any report available for given report_type since last 1 hour, then use it
@@ -98,12 +100,14 @@ class AmazonReportHelper
             if($reportID !== FALSE)
             {
                 $this->report_data_array["report_id"] = $reportID;
-                // Getting Final Report
+
+                //Setting up get report request object for pulling down final report
                 $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
                 $request_report_data->setMerchant($this->report_data_array["seller_id"]);
                 $request_report_data->setReport(@fopen('php://memory', 'rw+'));
                 $request_report_data->setReportId($reportID);
 
+                // Getting Final Report
                 $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
                 $this->report_data_array["done"] = TRUE;
                 return $this->report_data_array["report_data"];
@@ -112,61 +116,63 @@ class AmazonReportHelper
 
         //Didn't found any recent report, so requesting new report
         $request = new MarketplaceWebService_Model_RequestReportRequest();
+
+        //Setting up request report object for requesting report
         $marketplaceIdArray = array("Id" => array($this->report_data_array["marketplace_id"]));
         $request->setMarketplaceIdList($marketplaceIdArray);
         $request->setMerchant($this->report_data_array['seller_id']);
         $request->setReportType($this->report_type);
 
+        //Setting how many days back report data to get
         $request->setStartDate(new DateTime("$this->reporting_days Days", new DateTimeZone('UTC')));
 
         $this->report_data_array["report_request_id"] = $this->invokeRequestReport($this->service, $request);
 
-        // Getting final report
-        foreach($this->pos as $pos_id => $pos_data)
+        $report_requestID = $this->report_data_array["report_request_id"];
+
+        $report_request = new MarketplaceWebService_Model_GetReportRequestListRequest();
+        $report_request->setMerchant($this->report_data_array["seller_id"]);
+
+        $report_type_request = new MarketplaceWebService_Model_TypeList();
+        $report_type_request->setType($this->report_type);
+        $report_request->setReportTypeList($report_type_request);
+
+        $report_request_status = $this->invokeGetReportRequestList($this->service, $report_request, $report_requestID);
+
+        // If data for requested report is not available or report took too long then set report data to NULL and continue with other POS reports
+        if($report_request_status == FALSE)
         {
-            $report_requestID = $this->report_data_array["report_request_id"];
-
-            $report_request = new MarketplaceWebService_Model_GetReportRequestListRequest();
-            $report_request->setMerchant($this->report_data_array["seller_id"]);
-
-            $report_type_request = new MarketplaceWebService_Model_TypeList();
-            $report_type_request->setType($this->report_type);
-            $report_request->setReportTypeList($report_type_request);
-
-            $report_request_status = $this->invokeGetReportRequestList($this->service, $report_request, $report_requestID);
-
-            // If data for requested report is not available or report took too long then set report data to NULL and continue with other POS reports
-            if($report_request_status == FALSE)
-            {
-                continue;
-            }
-
-            // Getting report ID to get final report
-            $request_report_list = new MarketplaceWebService_Model_GetReportListRequest();
-            $request_report_list->setMerchant($this->report_data_array["seller_id"]);
-            $request_report_list->setAcknowledged(false);
-
-            $report_type_request = new MarketplaceWebService_Model_TypeList();
-            $report_type_request->setType($this->report_type);
-            $request_report_list->setReportTypeList($report_type_request);
-
-            $this->report_data_array["report_id"] = $this->invokeGetReportList($this->service, $request_report_list, $report_requestID);
-
-            // Getting Final Report
-            $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
-            $request_report_data->setMerchant($pos_data["merchant_id"]);
-            $request_report_data->setReport(@fopen('php://memory', 'rw+'));
-            $request_report_data->setReportId($this->report_data_array["report_id"]);
-
-            $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
+            return $this->report_error;
         }
+
+        //Setting up get report list request object for getting list of requested reports, in order to get report_id
+        $request_report_list = new MarketplaceWebService_Model_GetReportListRequest();
+        $request_report_list->setMerchant($this->report_data_array["seller_id"]);
+        $request_report_list->setAcknowledged(false);
+
+        $report_type_request = new MarketplaceWebService_Model_TypeList();
+        $report_type_request->setType($this->report_type);
+        $request_report_list->setReportTypeList($report_type_request);
+
+        // Getting report ID to get final report
+        $this->report_data_array["report_id"] = $this->invokeGetReportList($this->service, $request_report_list, $report_requestID);
+
+        //Setting up get report request object for pulling down final report
+        $request_report_data = new MarketplaceWebService_Model_GetReportRequest();
+        $request_report_data->setMerchant($pos_data["merchant_id"]);
+        $request_report_data->setReport(@fopen('php://memory', 'rw+'));
+        $request_report_data->setReportId($this->report_data_array["report_id"]);
+
+        // Getting Final Report
+        $this->report_data_array["report_data"] = $this->invokeGetReport($this->service, $request_report_data);
+
 
         return $this->report_data_array["report_data"];
     }
 
     private function check_report_generated_nearby_time()
     {
-        // Getting report ID to get final report
+        //Setting up get report list request object for getting list of requested reports, in order to get report_id
         $request_report_list = new MarketplaceWebService_Model_GetReportListRequest();
         $request_report_list->setMerchant($this->report_data_array["seller_id"]);
         $request_report_list->setAcknowledged(false);
@@ -177,6 +183,7 @@ class AmazonReportHelper
 
         try
         {
+            // Getting report ID to get final report
             $reportID = '';
             $response = $this->service->getReportList($request_report_list);
 
@@ -220,6 +227,7 @@ class AmazonReportHelper
         }
     }
 
+    //Requesting new report
     private function invokeRequestReport(MarketplaceWebService_Interface $service, $request)
     {
         try
@@ -251,6 +259,7 @@ class AmazonReportHelper
         }
     }
 
+    //Getting list of all requested reports for given report_type, inorder to check if report is ready or not
     private function invokeGetReportRequestList(MarketplaceWebService_Interface $service, $request, $report_requestID)
     {
         //Initially Wait for 90 Seconds.
@@ -274,7 +283,7 @@ class AmazonReportHelper
                     $reportRequestInfoList = $getReportRequestListResult->getReportRequestInfoList();
                     foreach($reportRequestInfoList as $reportRequestInfo)
                     {
-
+                        $this->report_error = $reportRequestInfo;
                         //Check Status For Requested Report ID
                         if($reportRequestInfo->getReportRequestId() == $report_requestID)
                         {
@@ -329,6 +338,7 @@ class AmazonReportHelper
         }
     }
 
+    //Get lest of all generated reports and gets report_id for getting the final report
     private function invokeGetReportList(MarketplaceWebService_Interface $service, $request, $report_request_ID)
     {
         try
@@ -374,6 +384,7 @@ class AmazonReportHelper
         }
     }
 
+    //Getting final report
     private function invokeGetReport(MarketplaceWebService_Interface $service, $request)
     {
         try
