@@ -1,3 +1,4 @@
+[![PyPI](https://img.shields.io/badge/release%20status-beta-red.svg)]()
 #Amazon API Helper Classes for PHP
 
 ##Description
