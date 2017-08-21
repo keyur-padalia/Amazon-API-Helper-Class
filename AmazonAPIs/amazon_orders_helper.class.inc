@@ -185,7 +185,7 @@ class AmazonOrdersHelper
     }
 
     /**
-	 * Getting Order's data and related items 
+     * Getting Order's data and related items 
      */
     public function getOrderData($orderId)
     {
@@ -219,13 +219,47 @@ class AmazonOrdersHelper
 
             //Order's data
             $order = $orderArray->GetOrderResult->Orders->Order;
+	     
+	    $orderData["order"]["order_id"] = $orderId;
+            $orderData["order"]["payment_method"] = (String) $order->PaymentMethod;
+            $orderData["order"]["purchase_date"] = (String) $order->PurchaseDate;
+            $orderData["order"]["buyer_email"] = (String) $order->BuyerEmail;
+            $orderData["order"]["buyer_name"] = (String) $order->BuyerName;
+            $orderData["order"]["currency"] = (String) $order->OrderTotal->CurrencyCode;
+            $orderData["order"]["fulfillment_channel"] = (String) $order->FulfillmentChannel;
+            $orderData["order"]["number_of_items_unshipped"] = (Int) $order->NumberOfItemsUnshipped;
 
+            $orderData["order"]["ship_service"] = (String) $order->ShipmentServiceLevelCategory;
+            $orderData["order"]["ship_service_level"] = (String) $order->ShipServiceLevel;
+            $orderData["order"]["recipient_name"] = (String) $order->ShippingAddress->Name;
+            $orderData["order"]["ship_address_1"] = (String) $order->ShippingAddress->AddressLine1;
+
+            if(isset($order->ShippingAddress->AddressLine2))
+                $orderData["order"]["ship_address_2"] = (String) $order->ShippingAddress->AddressLine2;
+            else
+                $orderData["order"]["ship_address_2"] = "";
+
+            if(isset($order->ShippingAddress->AddressLine3))
+                $orderData["order"]["ship_address_3"] = (String) $order->ShippingAddress->AddressLine3;
+            else
+                $orderData["order"]["ship_address_3"] = "";
+            $orderData["order"]["ship_city"] = (String) $order->ShippingAddress->City;
+
+            if(isset($order->ShippingAddress->StateOrRegion))
+                $orderData["order"]["ship_state"] = (String) $order->ShippingAddress->StateOrRegion;
+            else
+                $orderData["order"]["ship_state"] = "";
+            $orderData["order"]["ship_postal_code"] = (String) $order->ShippingAddress->PostalCode;
+            $orderData["order"]["ship_country"] = (String) $order->ShippingAddress->CountryCode;
+            $orderData["order"]["ship_phone_number"] = (String) $order->ShippingAddress->Phone;
+            $orderData["order"]["status_order"] = (String) $order->OrderStatus;
+            $orderData["order"]["ship_date"] = (String) $order->LastUpdateDate;
+            $orderData["order"]["subtotal"] = (Float) $order->OrderTotal->Amount;
+		
             // Getting Order Item's Detail
             $request = new MarketplaceWebServiceOrders_Model_ListOrderItemsRequest();
             $request->setSellerId($this->seller_id);
             $request->setAmazonOrderId($orderId);
-
-
             $response = $service->ListOrderItems($request);
 
             $dom = new DOMDocument();
@@ -237,8 +271,33 @@ class AmazonOrdersHelper
 
             $orderItemArray = simplexml_load_string($xml_data);
 
-			//Order's item array
+  	    //Order's item array
             $orderItems = $orderItemArray->ListOrderItemsResult->OrderItems->OrderItem;
+	    
+	    if(sizeof($orderItems) < 1)
+                return $orderData;
+
+            //order item's data
+            $item_counter = 0;
+            foreach($orderItems as $item)
+            {
+                $orderData["orderItems"][$item_counter]["ASIN"] = (String) $item->ASIN;
+                $orderData["orderItems"][$item_counter]["order_item_id"] = (String) $item->OrderItemId;
+                $orderData["orderItems"][$item_counter]["platform_sku"] = (String) $item->SellerSKU;
+                $orderData["orderItems"][$item_counter]["product_name"] = (String) $item->Title;
+                $orderData["orderItems"][$item_counter]["quantity_purchased"] = (Integer) $item->QuantityOrdered;
+                $orderData["orderItems"][$item_counter]["quantity_shipped"] = (Integer) $item->QuantityShipped;
+                $orderData["orderItems"][$item_counter]["item_price"] = (Float) $item->ItemPrice->Amount;
+                $orderData["orderItems"][$item_counter]["item_tax"] = (Float) $item->ItemTax->Amount;
+                $orderData["orderItems"][$item_counter]["shipping_price"] = (Float) $item->ShippingPrice->Amount;
+                $orderData["orderItems"][$item_counter]["shipping_tax"] = (Float) $item->ShippingTax->Amount;
+                $orderData["orderItems"][$item_counter]["gift_wrap_price"] = (Float) $item->GiftWrapPrice->Amount;
+                $orderData["orderItems"][$item_counter]["gift_wrap_tax"] = (Float) $item->GiftWrapTax->Amount;
+                $orderData["orderItems"][$item_counter]["item_promotion_discount"] = (Float) $item->PromotionDiscount->Amount;
+
+                $item_counter++;
+            }
+            return $orderData;
         }
         catch(MarketplaceWebServiceOrders_Exception $ex)
         {
