@@ -6,7 +6,7 @@ This Amazon API Helper Classes for PHP helps you to use Amazon APIs, such as:
 * Reports API
 * Products API (*not yet in this repository*)
 * Feeds API (*not yet in this repository*)
-* Orders API (*not yet in this repository*)
+* Orders API
 
 ###Installation
 
